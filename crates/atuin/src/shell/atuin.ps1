@@ -4,32 +4,29 @@ if ((Get-Module Atuin -ErrorAction Ignore) -or !(Get-Command atuin -ErrorAction 
 }
 
 New-Module -Name Atuin -ScriptBlock {
-    $env:ATUIN_SESSION = (atuin uuid)
+    $env:ATUIN_SESSION = atuin uuid
     $env:ATUIN_SHELL_POWERSHELL = "true"
 
     $atuinHistoryId = $null
-    $previousPromptFunction = $Function:prompt
 
-    $Function:prompt = {
+    function PSConsoleHostReadLine
+    {
+        $lastRunStatus = $?
         $exitCode = $global:LASTEXITCODE
 
         if ($atuinHistoryId)
         {
-            atuin history end --duration (Get-History -Count 1).Duration.TotalNanoseconds --exit $exitCode -- $atuinHistoryId | Out-Null
+            atuin history end --exit $exitCode --duration (Get-History -Count 1).Duration.TotalNanoseconds -- $atuinHistoryId | Out-Null
             $atuinHistoryId = $null
         }
 
+        Microsoft.PowerShell.Core\Set-StrictMode -Off
+        $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $lastRunStatus)
+
+        $atuinHistoryId = atuin history start -- $line
         $global:LASTEXITCODE = $exitCode
-        & $previousPromptFunction
-    }
 
-    Set-PSReadLineKeyHandler -Chord Enter -BriefDescription "Accepts the input and records the command in Atuin" -ScriptBlock {
-        $line = $null
-        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$null)
-
-        $atuinHistoryId = (atuin history start -- $line)
-
-        [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
+        $line
     }
 
     function RunSearch
@@ -99,5 +96,5 @@ New-Module -Name Atuin -ScriptBlock {
         }
     }
 
-    Export-ModuleMember -Function @("Enable-AtuinSearchKeys")
+    Export-ModuleMember -Function @("Enable-AtuinSearchKeys", "PSConsoleHostReadLine")
 } | Import-Module -Global
