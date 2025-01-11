@@ -45,7 +45,6 @@ New-Module -Name Atuin -ScriptBlock {
         $line = $null
         $cursor = $null
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-        [Microsoft.PowerShell.PSConsoleReadLine]::InsertLineBelow()
 
         $resultFile = New-TemporaryFile
         try {
