@@ -43,7 +43,8 @@ New-Module -Name Atuin -ScriptBlock {
         param([string[]]$ExtraArgs = @())
 
         $line = $null
-        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$null)
+        $cursor = $null
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
         [Microsoft.PowerShell.PSConsoleReadLine]::InsertLineBelow()
 
         $resultFile = New-TemporaryFile
@@ -69,7 +70,12 @@ New-Module -Name Atuin -ScriptBlock {
         }
 
         $acceptPrefix = "__atuin_accept__:"
-        if ( $suggestion.StartsWith($acceptPrefix)) {
+
+        if ($suggestion -eq "") {
+            [Microsoft.PowerShell.PSConsoleReadLine]::Insert($line)
+            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor)
+        }
+        elseif ( $suggestion.StartsWith($acceptPrefix)) {
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion.Substring($acceptPrefix.Length))
             [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
         }
@@ -89,7 +95,15 @@ New-Module -Name Atuin -ScriptBlock {
 
         if ($UpArrow) {
             Set-PSReadLineKeyHandler -Chord "UpArrow" -BriefDescription "Runs Atuin search" -ScriptBlock {
-                RunSearch -ExtraArgs @("--shell-up-key-binding")
+                $line = $null
+                [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$null)
+
+                if (!$line.Contains("`n")) {
+                    RunSearch -ExtraArgs @("--shell-up-key-binding")
+                }
+                else {
+                    [Microsoft.PowerShell.PSConsoleReadLine]::PreviousLine()
+                }
             }
         }
     }
