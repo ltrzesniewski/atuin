@@ -32,7 +32,7 @@ New-Module -Name Atuin -ScriptBlock {
 
         # Original PSConsoleHostReadLine implementation from PSReadLine.
         Microsoft.PowerShell.Core\Set-StrictMode -Off
-        $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $lastRunStatus)
+        $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext, $lastRunStatus)
 
         $script:atuinHistoryId = atuin history start -- $line
 
@@ -57,18 +57,21 @@ New-Module -Name Atuin -ScriptBlock {
             Remove-Item $resultFile
         }
 
-        [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
-
         $previousOutputEncoding = [Console]::OutputEncoding
         try {
             [Console]::OutputEncoding = [Text.Encoding]::UTF8
-            [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
+
+            # PSReadLine maintains its own cursor position, which will no longer be valid if Atuin scrolls the display in inline mode.
+            # Fortunately, InvokePrompt can receive a new Y position and reset the internal state.
+            [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $Host.UI.RawUI.CursorPosition.Y - 1)
         }
         finally {
             [Console]::OutputEncoding = $previousOutputEncoding
         }
 
         $acceptPrefix = "__atuin_accept__:"
+
+        [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
 
         if ($suggestion -eq "") {
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert($line)
