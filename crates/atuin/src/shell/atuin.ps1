@@ -1,4 +1,15 @@
-if ((Get-Module Atuin -ErrorAction Ignore) -or !(Get-Command atuin -ErrorAction Ignore) -or !(Get-Module PSReadLine -ErrorAction Ignore)) {
+if (Get-Module Atuin -ErrorAction Ignore) {
+    Write-Warning "The Atuin module is already loaded."
+    return
+}
+
+if (!(Get-Command atuin -ErrorAction Ignore)) {
+    Write-Error "The 'atuin' executable needs to be available in the PATH."
+    return
+}
+
+if (!(Get-Module PSReadLine -ErrorAction Ignore)) {
+    Write-Error "Atuin requires the PSReadLine module to be installed."
     return
 }
 
@@ -12,7 +23,7 @@ New-Module -Name Atuin -ScriptBlock {
         # This needs to be done as the first thing because any script run will flush $?.
         $lastRunStatus = $?
 
-        # Exit statuses are maintained separately for native and PowerShell commands, take this into account.
+        # Exit statuses are maintained separately for native and PowerShell commands, this needs to be taken into account.
         $exitCode = if ($lastRunStatus) {
             0
         }
@@ -26,6 +37,7 @@ New-Module -Name Atuin -ScriptBlock {
         if ($script:atuinHistoryId) {
             $duration = (Get-History -Count 1).Duration.TotalNanoseconds
             atuin history end --exit=$exitCode --duration=$duration -- $script:atuinHistoryId | Out-Null
+
             $global:LASTEXITCODE = $exitCode
             $script:atuinHistoryId = $null
         }
@@ -36,7 +48,7 @@ New-Module -Name Atuin -ScriptBlock {
 
         $script:atuinHistoryId = atuin history start -- $line
 
-        $line
+        return $line
     }
 
     function RunSearch {
@@ -46,10 +58,13 @@ New-Module -Name Atuin -ScriptBlock {
         $cursor = $null
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
 
+        # Atuin is started through Start-Process to avoid interfering with the current shell,
+        # and to capture its output which is provided in stderr (redirected to a temporary file).
+
         $resultFile = New-TemporaryFile
         try {
             $env:ATUIN_SHELL_POWERSHELL = "true"
-            Start-Process -Wait -NoNewWindow -RedirectStandardError $resultFile.FullName atuin -ArgumentList (@("search", "-i") + $ExtraArgs + @("--", "$line"))
+            Start-Process -Wait -NoNewWindow -RedirectStandardError $resultFile.FullName -FilePath atuin -ArgumentList (@("search", "-i") + $ExtraArgs + @("--", "$line"))
             $suggestion = (Get-Content -Raw $resultFile).Trim()
         }
         finally {
