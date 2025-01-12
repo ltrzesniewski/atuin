@@ -26,6 +26,7 @@ pub struct Cmd {
 
 #[derive(Clone, Copy, ValueEnum, Debug)]
 #[value(rename_all = "lower")]
+#[allow(clippy::enum_variant_names, clippy::doc_markdown)]
 pub enum Shell {
     /// Zsh setup
     Zsh,
@@ -161,13 +162,7 @@ $env.config = (
                 .await?;
             }
             Shell::PowerShell => {
-                powershell::init(
-                    alias_store,
-                    var_store,
-                    self.disable_up_arrow,
-                    self.disable_ctrl_r,
-                )
-                .await?;
+                powershell::init_static(self.disable_up_arrow, self.disable_ctrl_r);
             }
         }
 
