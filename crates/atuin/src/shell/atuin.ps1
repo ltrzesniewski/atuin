@@ -1,3 +1,7 @@
+# Atuin PowerShell module
+#
+# Usage: atuin init powershell | Out-String | Invoke-Expression
+
 if (Get-Module Atuin -ErrorAction Ignore) {
     Write-Warning "The Atuin module is already loaded."
     return
@@ -19,31 +23,22 @@ New-Module -Name Atuin -ScriptBlock {
     $script:atuinHistoryId = $null
     $script:previousPSConsoleHostReadLine = $Function:PSConsoleHostReadLine
 
+    # The ReadLine overloads changed with breaking changes over time, make sure the one we expect is available.
+    $script:hasExpectedReadLineOverload = ([Microsoft.PowerShell.PSConsoleReadLine]::ReadLine).OverloadDefinitions.Contains("static string ReadLine(runspace runspace, System.Management.Automation.EngineIntrinsics engineIntrinsics, System.Threading.CancellationToken cancellationToken, System.Nullable[bool] lastRunStatus)")
+
     function PSConsoleHostReadLine {
         # This needs to be done as the first thing because any script run will flush $?.
         $lastRunStatus = $?
 
         # Exit statuses are maintained separately for native and PowerShell commands, this needs to be taken into account.
-        $exitCode = if ($lastRunStatus) {
-            0
-        }
-        elseif ($global:LASTEXITCODE) {
-            $global:LASTEXITCODE
-        }
-        else {
-            1
-        }
+        $exitCode = if ($lastRunStatus) { 0 } elseif ($global:LASTEXITCODE) { $global:LASTEXITCODE } else { 1 }
 
         if ($script:atuinHistoryId) {
-            # The duration is not recorded on old PowerShell versions.
+            # The duration is not recorded in old PowerShell versions, let Atuin handle it.
             $duration = (Get-History -Count 1).Duration.Ticks * 100
+            $durationArg = if ($duration) { "--duration=$duration" } else { "" }
 
-            if ($duration) {
-                atuin history end --exit=$exitCode --duration=$duration -- $script:atuinHistoryId | Out-Null
-            }
-            else {
-                atuin history end --exit=$exitCode -- $script:atuinHistoryId | Out-Null
-            }
+            atuin history end --exit=$exitCode $durationArg -- $script:atuinHistoryId | Out-Null
 
             $global:LASTEXITCODE = $exitCode
             $script:atuinHistoryId = $null
@@ -52,13 +47,12 @@ New-Module -Name Atuin -ScriptBlock {
         # PSConsoleHostReadLine implementation from PSReadLine, adjusted to support old versions.
         Microsoft.PowerShell.Core\Set-StrictMode -Off
 
-        $line = $null
-        try {
-            $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext, [System.Threading.CancellationToken]::None, $lastRunStatus)
-        }
-        catch {
-            # PSReadLine < v2.2.0-beta3
-            $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext, [System.Threading.CancellationToken]::None)
+        $line = if ($script:hasExpectedReadLineOverload) {
+            # When the overload we expect is available, we can pass $lastRunStatus to it.
+            [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext, [System.Threading.CancellationToken]::None, $lastRunStatus)
+        } else {
+            # Either PSReadLine is older than v2.2.0-beta3, or maybe newer than we expect, so use the function from PSReadLine as-is.
+            & $script:previousPSConsoleHostReadLine
         }
 
         $script:atuinHistoryId = atuin history start -- $line
@@ -76,6 +70,7 @@ New-Module -Name Atuin -ScriptBlock {
         # Atuin is started through Start-Process to avoid interfering with the current shell,
         # and to capture its output which is provided in stderr (redirected to a temporary file).
 
+        $suggestion = ""
         $resultFile = New-TemporaryFile
         try {
             $env:ATUIN_SHELL_POWERSHELL = "true"
@@ -88,16 +83,16 @@ New-Module -Name Atuin -ScriptBlock {
             Remove-Item $resultFile
         }
 
-        $previousOutputEncoding = [Console]::OutputEncoding
+        $previousOutputEncoding = [System.Console]::OutputEncoding
         try {
-            [Console]::OutputEncoding = [Text.Encoding]::UTF8
+            [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
             # PSReadLine maintains its own cursor position, which will no longer be valid if Atuin scrolls the display in inline mode.
             # Fortunately, InvokePrompt can receive a new Y position and reset the internal state.
             [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $Host.UI.RawUI.CursorPosition.Y - 1)
         }
         finally {
-            [Console]::OutputEncoding = $previousOutputEncoding
+            [System.Console]::OutputEncoding = $previousOutputEncoding
         }
 
         if ($suggestion -eq "") {
@@ -111,8 +106,7 @@ New-Module -Name Atuin -ScriptBlock {
             [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion.Substring($acceptPrefix.Length))
             [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
-        }
-        else {
+        } else {
             [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion)
         }
@@ -134,8 +128,7 @@ New-Module -Name Atuin -ScriptBlock {
 
                 if (!$line.Contains("`n")) {
                     RunSearch -ExtraArgs "--shell-up-key-binding"
-                }
-                else {
+                } else {
                     [Microsoft.PowerShell.PSConsoleReadLine]::PreviousLine()
                 }
             }
