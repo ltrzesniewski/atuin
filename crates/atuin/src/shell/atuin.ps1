@@ -35,16 +35,31 @@ New-Module -Name Atuin -ScriptBlock {
         }
 
         if ($script:atuinHistoryId) {
-            $duration = (Get-History -Count 1).Duration.TotalNanoseconds
-            atuin history end --exit=$exitCode --duration=$duration -- $script:atuinHistoryId | Out-Null
+            # The duration is not recorded on old PowerShell versions.
+            $duration = (Get-History -Count 1).Duration.Ticks * 100
+
+            if ($duration) {
+                atuin history end --exit=$exitCode --duration=$duration -- $script:atuinHistoryId | Out-Null
+            }
+            else {
+                atuin history end --exit=$exitCode -- $script:atuinHistoryId | Out-Null
+            }
 
             $global:LASTEXITCODE = $exitCode
             $script:atuinHistoryId = $null
         }
 
-        # Original PSConsoleHostReadLine implementation from PSReadLine.
+        # PSConsoleHostReadLine implementation from PSReadLine, adjusted to support old versions.
         Microsoft.PowerShell.Core\Set-StrictMode -Off
-        $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext, $lastRunStatus)
+
+        $line = $null
+        try {
+            $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext, [System.Threading.CancellationToken]::None, $lastRunStatus)
+        }
+        catch {
+            # PSReadLine < v2.2.0-beta3
+            $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext, [System.Threading.CancellationToken]::None)
+        }
 
         $script:atuinHistoryId = atuin history start -- $line
 
@@ -52,7 +67,7 @@ New-Module -Name Atuin -ScriptBlock {
     }
 
     function RunSearch {
-        param([string[]]$ExtraArgs = @())
+        param([string]$ExtraArgs = "")
 
         $line = $null
         $cursor = $null
@@ -64,7 +79,8 @@ New-Module -Name Atuin -ScriptBlock {
         $resultFile = New-TemporaryFile
         try {
             $env:ATUIN_SHELL_POWERSHELL = "true"
-            Start-Process -Wait -NoNewWindow -RedirectStandardError $resultFile.FullName -FilePath atuin -ArgumentList (@("search", "-i") + $ExtraArgs + @("--", "$line"))
+            $argString = "search -i $ExtraArgs -- $line"
+            Start-Process -Wait -NoNewWindow -RedirectStandardError $resultFile.FullName -FilePath atuin -ArgumentList $argString
             $suggestion = (Get-Content -Raw $resultFile).Trim()
         }
         finally {
@@ -117,7 +133,7 @@ New-Module -Name Atuin -ScriptBlock {
                 [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$null)
 
                 if (!$line.Contains("`n")) {
-                    RunSearch -ExtraArgs @("--shell-up-key-binding")
+                    RunSearch -ExtraArgs "--shell-up-key-binding"
                 }
                 else {
                     [Microsoft.PowerShell.PSConsoleReadLine]::PreviousLine()
