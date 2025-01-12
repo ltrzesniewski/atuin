@@ -84,19 +84,20 @@ New-Module -Name Atuin -ScriptBlock {
             [Console]::OutputEncoding = $previousOutputEncoding
         }
 
+        if ($suggestion -eq "") {
+            # The previous input was already rendered by InvokePrompt
+            return
+        }
+
         $acceptPrefix = "__atuin_accept__:"
 
-        [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
-
-        if ($suggestion -eq "") {
-            [Microsoft.PowerShell.PSConsoleReadLine]::Insert($line)
-            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor)
-        }
-        elseif ( $suggestion.StartsWith($acceptPrefix)) {
+        if ( $suggestion.StartsWith($acceptPrefix)) {
+            [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion.Substring($acceptPrefix.Length))
             [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
         }
         else {
+            [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion)
         }
     }
