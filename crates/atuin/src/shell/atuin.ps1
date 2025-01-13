@@ -88,7 +88,7 @@ New-Module -Name Atuin -ScriptBlock {
 
             # PSReadLine maintains its own cursor position, which will no longer be valid if Atuin scrolls the display in inline mode.
             # Fortunately, InvokePrompt can receive a new Y position and reset the internal state.
-            [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $Host.UI.RawUI.CursorPosition.Y)
+            [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $Host.UI.RawUI.CursorPosition.Y + [int]$env:ATUIN_POWERSHELL_PROMPT_OFFSET)
 
             if ($suggestion -eq "") {
                 # The previous input was already rendered by InvokePrompt
