@@ -64,8 +64,7 @@ New-Module -Name Atuin -ScriptBlock {
         param([string]$ExtraArgs = "")
 
         $line = $null
-        $cursor = $null
-        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$null)
 
         # Atuin is started through Start-Process to avoid interfering with the current shell,
         # and to capture its output which is provided in stderr (redirected to a temporary file).
@@ -76,7 +75,7 @@ New-Module -Name Atuin -ScriptBlock {
             $env:ATUIN_SHELL_POWERSHELL = "true"
             $argString = "search -i $ExtraArgs -- $line"
             Start-Process -Wait -NoNewWindow -RedirectStandardError $resultFile.FullName -FilePath atuin -ArgumentList $argString
-            $suggestion = (Get-Content -Raw $resultFile | Out-String).Trim()
+            $suggestion = (Get-Content -Raw $resultFile -Encoding UTF8 | Out-String).Trim()
         }
         finally {
             $env:ATUIN_SHELL_POWERSHELL = $null
@@ -90,25 +89,25 @@ New-Module -Name Atuin -ScriptBlock {
             # PSReadLine maintains its own cursor position, which will no longer be valid if Atuin scrolls the display in inline mode.
             # Fortunately, InvokePrompt can receive a new Y position and reset the internal state.
             [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null, $Host.UI.RawUI.CursorPosition.Y)
+
+            if ($suggestion -eq "") {
+                # The previous input was already rendered by InvokePrompt
+                return
+            }
+
+            $acceptPrefix = "__atuin_accept__:"
+
+            if ( $suggestion.StartsWith($acceptPrefix)) {
+                [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
+                [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion.Substring($acceptPrefix.Length))
+                [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
+            } else {
+                [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
+                [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion)
+            }
         }
         finally {
             [System.Console]::OutputEncoding = $previousOutputEncoding
-        }
-
-        if ($suggestion -eq "") {
-            # The previous input was already rendered by InvokePrompt
-            return
-        }
-
-        $acceptPrefix = "__atuin_accept__:"
-
-        if ( $suggestion.StartsWith($acceptPrefix)) {
-            [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
-            [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion.Substring($acceptPrefix.Length))
-            [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
-        } else {
-            [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
-            [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion)
         }
     }
 
