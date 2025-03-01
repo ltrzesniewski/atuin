@@ -168,6 +168,26 @@ impl AliasStore {
         Ok(config)
     }
 
+    pub async fn powershell(&self) -> Result<String> {
+        let aliases = self.aliases().await?;
+
+        let mut config = String::new();
+
+        for alias in aliases {
+            // If it's quoted, remove the quotes. If it's not quoted, do nothing.
+            let value = unquote(alias.value.as_str()).unwrap_or(alias.value.clone());
+
+            // Set-Alias doesn't support adding implicit arguments, so use a function.
+            // See https://github.com/PowerShell/PowerShell/issues/12962
+            config.push_str(&format!(
+                "\nfunction {} {{\n    {} @args\n}}\n",
+                alias.name, value
+            ));
+        }
+
+        Ok(config)
+    }
+
     pub async fn build(&self) -> Result<()> {
         let dir = atuin_common::utils::dotfiles_cache_dir();
         tokio::fs::create_dir_all(dir.clone()).await?;
@@ -175,6 +195,7 @@ impl AliasStore {
         // Build for all supported shells
         let posix = self.posix().await?;
         let xonsh = self.xonsh().await?;
+        let powershell = self.powershell().await?;
 
         // All the same contents, maybe optimize in the future or perhaps there will be quirks
         // per-shell
@@ -183,11 +204,13 @@ impl AliasStore {
         let bash = dir.join("aliases.bash");
         let fish = dir.join("aliases.fish");
         let xsh = dir.join("aliases.xsh");
+        let ps1 = dir.join("aliases.ps1");
 
         tokio::fs::write(zsh, &posix).await?;
         tokio::fs::write(bash, &posix).await?;
         tokio::fs::write(fish, &posix).await?;
         tokio::fs::write(xsh, &xonsh).await?;
+        tokio::fs::write(ps1, &powershell).await?;
 
         Ok(())
     }
@@ -390,6 +413,25 @@ mod tests {
 alias k='kubectl'
 alias kgap='kubectl get pods --all-namespaces'
 "
-        )
+        );
+
+        let build = alias.powershell().await.expect("failed to build aliases");
+
+        assert_eq!(
+            build,
+            "
+function gp {
+    git push @args
+}
+
+function k {
+    kubectl @args
+}
+
+function kgap {
+    kubectl get pods --all-namespaces @args
+}
+"
+        );
     }
 }

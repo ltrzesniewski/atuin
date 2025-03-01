@@ -155,6 +155,22 @@ impl VarStore {
         Ok(config)
     }
 
+    pub async fn powershell(&self) -> Result<String> {
+        let env = self.vars().await?;
+
+        let mut config = String::new();
+
+        for env in env {
+            config.push_str(&format!(
+                "$env:{} = '{}'\n",
+                env.name,
+                env.value.replace("'", "''")
+            ));
+        }
+
+        Ok(config)
+    }
+
     pub async fn build(&self) -> Result<()> {
         let dir = atuin_common::utils::dotfiles_cache_dir();
         tokio::fs::create_dir_all(dir.clone()).await?;
@@ -163,6 +179,7 @@ impl VarStore {
         let posix = self.posix().await?;
         let xonsh = self.xonsh().await?;
         let fsh = self.fish().await?;
+        let powershell = self.powershell().await?;
 
         // All the same contents, maybe optimize in the future or perhaps there will be quirks
         // per-shell
@@ -171,11 +188,13 @@ impl VarStore {
         let bash = dir.join("vars.bash");
         let fish = dir.join("vars.fish");
         let xsh = dir.join("vars.xsh");
+        let ps1 = dir.join("vars.ps1");
 
         tokio::fs::write(zsh, &posix).await?;
         tokio::fs::write(bash, &posix).await?;
         tokio::fs::write(fish, &fsh).await?;
         tokio::fs::write(xsh, &xonsh).await?;
+        tokio::fs::write(ps1, &powershell).await?;
 
         Ok(())
     }
