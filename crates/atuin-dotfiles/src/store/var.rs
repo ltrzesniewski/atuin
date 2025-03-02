@@ -387,4 +387,24 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn format_powershell() {
+        let env = [
+            Var {
+                name: "FOO".to_owned(),
+                value: "bar 'baz'".to_owned(),
+                export: true,
+            },
+            Var {
+                name: "TEST".to_owned(),
+                value: "1".to_owned(),
+                export: true,
+            },
+        ];
+
+        let result = VarStore::format_powershell(&env);
+
+        assert_eq!(result, "$env:FOO = 'bar ''baz'''\n$env:TEST = '1'\n");
+    }
 }
