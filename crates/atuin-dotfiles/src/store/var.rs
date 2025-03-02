@@ -174,7 +174,8 @@ impl VarStore {
 
         for env in env {
             config.push_str(&format!(
-                "$env:{} = '{}'\n",
+                "${}{} = '{}'\n",
+                if env.export { "env:" } else { "" },
                 env.name,
                 env.value.replace("'", "''")
             ));
@@ -399,12 +400,12 @@ mod tests {
             Var {
                 name: "TEST".to_owned(),
                 value: "1".to_owned(),
-                export: true,
+                export: false,
             },
         ];
 
         let result = VarStore::format_powershell(&env);
 
-        assert_eq!(result, "$env:FOO = 'bar ''baz'''\n$env:TEST = '1'\n");
+        assert_eq!(result, "$env:FOO = 'bar ''baz'''\n$TEST = '1'\n");
     }
 }
