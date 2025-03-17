@@ -183,18 +183,7 @@ impl AliasStore {
         let mut config = String::new();
 
         for alias in aliases {
-            // Set-Alias doesn't support adding implicit arguments, so use a function.
-            // See https://github.com/PowerShell/PowerShell/issues/12962
-            config.push_str(&format!(
-                "\nfunction {} {{\n    {}{} @args\n}}\n",
-                alias.name,
-                if alias.value.starts_with(['"', '\'']) {
-                    "& "
-                } else {
-                    ""
-                },
-                alias.value
-            ));
+            config.push_str(&crate::shell::powershell::format_alias(alias));
         }
 
         config
@@ -426,35 +415,6 @@ mod tests {
             "alias gp='git push'
 alias k='kubectl'
 alias kgap='kubectl get pods --all-namespaces'
-"
-        )
-    }
-
-    #[test]
-    fn format_powershell() {
-        let aliases = [
-            Alias {
-                name: "gp".to_string(),
-                value: "git push".to_string(),
-            },
-            Alias {
-                name: "spc".to_string(),
-                value: "\"path with spaces\" arg".to_string(),
-            },
-        ];
-
-        let result = AliasStore::format_powershell(&aliases);
-
-        assert_eq!(
-            result,
-            "
-function gp {
-    git push @args
-}
-
-function spc {
-    & \"path with spaces\" arg @args
-}
 "
         )
     }

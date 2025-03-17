@@ -173,12 +173,7 @@ impl VarStore {
         let mut config = String::new();
 
         for env in env {
-            config.push_str(&format!(
-                "${}{} = '{}'\n",
-                if env.export { "env:" } else { "" },
-                env.name,
-                env.value.replace("'", "''")
-            ));
+            config.push_str(&crate::shell::powershell::format_var(env));
         }
 
         config
@@ -387,25 +382,5 @@ mod tests {
                 export: true,
             }
         );
-    }
-
-    #[test]
-    fn format_powershell() {
-        let env = [
-            Var {
-                name: "FOO".to_owned(),
-                value: "bar 'baz'".to_owned(),
-                export: true,
-            },
-            Var {
-                name: "TEST".to_owned(),
-                value: "1".to_owned(),
-                export: false,
-            },
-        ];
-
-        let result = VarStore::format_powershell(&env);
-
-        assert_eq!(result, "$env:FOO = 'bar ''baz'''\n$TEST = '1'\n");
     }
 }
