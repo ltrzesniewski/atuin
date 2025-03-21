@@ -1,5 +1,5 @@
 use crate::shell::{Alias, Var};
-use crate::store::{var::VarStore, AliasStore};
+use crate::store::{AliasStore, var::VarStore};
 use std::path::PathBuf;
 
 async fn cached_aliases(path: PathBuf, store: &AliasStore) -> String {

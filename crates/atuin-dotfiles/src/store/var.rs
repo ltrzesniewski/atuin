@@ -172,8 +172,8 @@ impl VarStore {
     fn format_powershell(env: &[Var]) -> String {
         let mut config = String::new();
 
-        for env in env {
-            config.push_str(&crate::shell::powershell::format_var(env));
+        for var in env {
+            config.push_str(&crate::shell::powershell::format_var(var));
         }
 
         config

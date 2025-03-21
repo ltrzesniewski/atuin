@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{stderr, IsTerminal as _, Write};
+use std::io::{IsTerminal as _, Write, stderr};
 
 use atuin_common::utils::{self, Escapable as _};
 use clap::Parser;

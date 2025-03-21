@@ -1,4 +1,4 @@
-use atuin_dotfiles::store::{var::VarStore, AliasStore};
+use atuin_dotfiles::store::{AliasStore, var::VarStore};
 
 pub fn init_static(disable_up_arrow: bool, disable_ctrl_r: bool) {
     let base = include_str!("../../../shell/atuin.ps1");
@@ -35,9 +35,5 @@ pub async fn init(
 }
 
 fn ps_bool(value: bool) -> &'static str {
-    if value {
-        "$true"
-    } else {
-        "$false"
-    }
+    if value { "$true" } else { "$false" }
 }
