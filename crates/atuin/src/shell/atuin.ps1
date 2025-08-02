@@ -34,9 +34,9 @@ New-Module -Name Atuin -ScriptBlock {
         $exitCode = if ($lastRunStatus) { 0 } elseif ($global:LASTEXITCODE) { $global:LASTEXITCODE } else { 1 }
 
         if ($script:atuinHistoryId) {
-            # The duration is not recorded in old PowerShell versions, let Atuin handle it.
+            # The duration is not recorded in old PowerShell versions, let Atuin handle it. $null arguments are ignored.
             $duration = (Get-History -Count 1).Duration.Ticks * 100
-            $durationArg = if ($duration) { "--duration=$duration" } else { "" }
+            $durationArg = if ($duration) { "--duration=$duration" } else { $null }
 
             atuin history end --exit=$exitCode $durationArg -- $script:atuinHistoryId | Out-Null
 
@@ -55,7 +55,13 @@ New-Module -Name Atuin -ScriptBlock {
             & $script:previousPSConsoleHostReadLine
         }
 
-        $script:atuinHistoryId = atuin history start -- $line
+        try {
+            $env:ATUIN_COMMAND_LINE = $line
+            $script:atuinHistoryId = atuin history start --command-from-env
+        }
+        finally {
+            $env:ATUIN_COMMAND_LINE = $null
+        }
 
         return $line
     }
