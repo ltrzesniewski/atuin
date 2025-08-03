@@ -1,5 +1,7 @@
 # Atuin PowerShell module
 #
+# This should support PowerShell 5.1 (which is shipped with Windows) and later versions, on Windows and Linux.
+#
 # Usage: atuin init powershell | Out-String | Invoke-Expression
 
 if (Get-Module Atuin -ErrorAction Ignore) {
@@ -26,12 +28,18 @@ New-Module -Name Atuin -ScriptBlock {
     # The ReadLine overloads changed with breaking changes over time, make sure the one we expect is available.
     $script:hasExpectedReadLineOverload = ([Microsoft.PowerShell.PSConsoleReadLine]::ReadLine).OverloadDefinitions.Contains("static string ReadLine(runspace runspace, System.Management.Automation.EngineIntrinsics engineIntrinsics, System.Threading.CancellationToken cancellationToken, System.Nullable[bool] lastRunStatus)")
 
+    # This function name is called by PSReadLine to read the next command line to execute.
+    # We replace it with a custom implementation which adds Atuin support.
     function PSConsoleHostReadLine {
+        ## 1. Collect the exit code of the previous command.
+
         # This needs to be done as the first thing because any script run will flush $?.
         $lastRunStatus = $?
 
         # Exit statuses are maintained separately for native and PowerShell commands, this needs to be taken into account.
         $exitCode = if ($lastRunStatus) { 0 } elseif ($global:LASTEXITCODE) { $global:LASTEXITCODE } else { 1 }
+
+        ## 2. Report the status of the previous command to Atuin (atuin history end).
 
         if ($script:atuinHistoryId) {
             # The duration is not recorded in old PowerShell versions, let Atuin handle it. $null arguments are ignored.
@@ -44,6 +52,8 @@ New-Module -Name Atuin -ScriptBlock {
             $script:atuinHistoryId = $null
         }
 
+        ## 3. Read the next command line to execute.
+
         # PSConsoleHostReadLine implementation from PSReadLine, adjusted to support old versions.
         Microsoft.PowerShell.Core\Set-StrictMode -Off
 
@@ -55,6 +65,11 @@ New-Module -Name Atuin -ScriptBlock {
             & $script:previousPSConsoleHostReadLine
         }
 
+        ## 4. Report the next command line to Atuin (atuin history start).
+
+        # PowerShell doesn't handle double quotes in native command line arguments the same way depending on its version,
+        # and the value of $PSNativeCommandArgumentPassing - see the about_Parsing help page which explains the breaking changes.
+        # This makes it unreliable, so we go through an environment variable, which should always be consistent across versions.
         try {
             $env:ATUIN_COMMAND_LINE = $line
             $script:atuinHistoryId = atuin history start --command-from-env
