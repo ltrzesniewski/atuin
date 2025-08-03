@@ -95,7 +95,8 @@ New-Module -Name Atuin -ScriptBlock {
 
             # Atuin is started through Start-Process to avoid interfering with the current shell.
             $env:ATUIN_SHELL_POWERSHELL = "true"
-            $argString = "search -i --result-file ""$resultFile"" $ExtraArgs -- $line"
+            $env:ATUIN_QUERY = $line
+            $argString = "search -i --result-file ""$resultFile"" $ExtraArgs"
             Start-Process -Wait -NoNewWindow -FilePath atuin -ArgumentList $argString
             $suggestion = (Get-Content -Raw $resultFile -Encoding UTF8 | Out-String).Trim()
 
@@ -122,6 +123,7 @@ New-Module -Name Atuin -ScriptBlock {
         finally {
             [System.Console]::OutputEncoding = $previousOutputEncoding
             $env:ATUIN_SHELL_POWERSHELL = $null
+            $env:ATUIN_QUERY = $null
             Remove-Item $resultFile
         }
     }
