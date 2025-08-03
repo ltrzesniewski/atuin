@@ -34,7 +34,7 @@ use super::search::format_duration_into;
 pub enum Cmd {
     /// Begins a new command in the history
     Start {
-        /// Collects the command from the ATUIN_COMMAND_LINE environment variable,
+        /// Collects the command from the `ATUIN_COMMAND_LINE` environment variable,
         /// which does not need escaping and is more compatible between OS and shells
         #[arg(long = "command-from-env", hide = true)]
         cmd_env: bool,
