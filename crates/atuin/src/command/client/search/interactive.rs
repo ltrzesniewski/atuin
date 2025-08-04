@@ -866,13 +866,12 @@ impl State {
     }
 
     fn build_stats(&self, theme: &Theme) -> Paragraph {
-        let stats = Paragraph::new(Text::from(Span::raw(format!(
+        Paragraph::new(Text::from(Span::raw(format!(
             "history count: {}",
             self.history_count,
         ))))
         .style(theme.as_style(Meaning::Annotation))
-        .alignment(Alignment::Right);
-        stats
+        .alignment(Alignment::Right)
     }
 
     fn build_results_list<'a>(
@@ -966,7 +965,8 @@ impl State {
                 })
                 .join("\n")
         };
-        let preview = if compact {
+
+        if compact {
             Paragraph::new(command).style(theme.as_style(Meaning::Annotation))
         } else {
             Paragraph::new(command).block(
@@ -975,8 +975,7 @@ impl State {
                     .border_type(BorderType::Rounded)
                     .title(format!("{:─>width$}", "", width = chunk_width - 2)),
             )
-        };
-        preview
+        }
     }
 }
 
@@ -1049,7 +1048,11 @@ impl Write for Stdout {
 // this is a big blob of horrible! clean it up!
 // for now, it works. But it'd be great if it were more easily readable, and
 // modular. I'd like to add some more stats and stuff at some point
-#[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::too_many_lines,
+    clippy::cognitive_complexity
+)]
 pub async fn history(
     query: &[String],
     settings: &Settings,
@@ -1057,20 +1060,45 @@ pub async fn history(
     history_store: &HistoryStore,
     theme: &Theme,
 ) -> Result<String> {
-    let stdout = Stdout::new(settings.inline_height > 0)?;
+    let inline_height = if settings.shell_up_key_binding {
+        settings
+            .inline_height_shell_up_key_binding
+            .unwrap_or(settings.inline_height)
+    } else {
+        settings.inline_height
+    };
+
+    let stdout = Stdout::new(inline_height > 0)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::with_options(
         backend,
         TerminalOptions {
-            viewport: if settings.inline_height > 0 {
-                Viewport::Inline(settings.inline_height)
+            viewport: if inline_height > 0 {
+                Viewport::Inline(inline_height)
             } else {
                 Viewport::Fullscreen
             },
         },
     )?;
 
-    let mut input = Cursor::from(query.join(" "));
+    let original_query = query.join(" ");
+
+    // Check if this is a command chaining scenario
+    let is_command_chaining = if settings.command_chaining {
+        let trimmed = original_query.trim_end();
+        trimmed.ends_with("&&") || trimmed.ends_with("||")
+    } else {
+        false
+    };
+
+    // For command chaining, start with empty input to allow searching for new commands
+    let search_input = if is_command_chaining {
+        String::new()
+    } else {
+        original_query.clone()
+    };
+
+    let mut input = Cursor::from(search_input);
     // Put the cursor at the end of the query by default
     input.end();
 
@@ -1126,7 +1154,7 @@ pub async fn history(
 
     let mut results = app.query_results(&mut db, settings.smart_sort).await?;
 
-    if settings.inline_height > 0 {
+    if inline_height > 0 {
         terminal.clear()?;
     }
 
@@ -1207,7 +1235,7 @@ pub async fn history(
 
     app.finalize_keymap_cursor(settings);
 
-    if settings.inline_height > 0 {
+    if inline_height > 0 {
         terminal.clear()?;
     }
 
@@ -1221,7 +1249,11 @@ pub async fn history(
                     || utils::is_xonsh()
                     || utils::is_powershell())
             {
-                command = String::from("__atuin_accept__:") + &command;
+                if is_command_chaining {
+                    command = String::from("__atuin_chain_command__:") + &command;
+                } else {
+                    command = String::from("__atuin_accept__:") + &command;
+                }
             }
 
             // index is in bounds so we return that entry
@@ -1279,6 +1311,7 @@ mod tests {
     use super::State;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn calc_preview_height_test() {
         let settings_preview_auto = Settings {
             preview: Preview {

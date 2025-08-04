@@ -205,7 +205,6 @@ mod tests {
     use pretty_assertions::assert_ne;
 
     use super::*;
-    use std::env;
 
     use std::collections::HashSet;
 
@@ -219,6 +218,7 @@ mod tests {
         test_data_dir();
     }
 
+    #[cfg(not(windows))]
     fn test_config_dir_xdg() {
         // TODO: Audit that the environment access only happens in single-threaded code.
         unsafe { env::remove_var("HOME") };
@@ -232,6 +232,7 @@ mod tests {
         unsafe { env::remove_var("XDG_CONFIG_HOME") };
     }
 
+    #[cfg(not(windows))]
     fn test_config_dir() {
         // TODO: Audit that the environment access only happens in single-threaded code.
         unsafe { env::set_var("HOME", "/home/user") };
@@ -244,6 +245,7 @@ mod tests {
         unsafe { env::remove_var("HOME") };
     }
 
+    #[cfg(not(windows))]
     fn test_data_dir_xdg() {
         // TODO: Audit that the environment access only happens in single-threaded code.
         unsafe { env::remove_var("HOME") };
@@ -254,6 +256,7 @@ mod tests {
         unsafe { env::remove_var("XDG_DATA_HOME") };
     }
 
+    #[cfg(not(windows))]
     fn test_data_dir() {
         // TODO: Audit that the environment access only happens in single-threaded code.
         unsafe { env::set_var("HOME", "/home/user") };

@@ -228,7 +228,7 @@ async fn start_server(settings: Settings, history: HistoryService) -> Result<()>
     use tokio_stream::wrappers::TcpListenerStream;
 
     let port = settings.daemon.tcp_port;
-    let url = format!("127.0.0.1:{}", port);
+    let url = format!("127.0.0.1:{port}");
     let tcp = TcpListener::bind(url).await?;
     let tcp_stream = TcpListenerStream::new(tcp);
 
