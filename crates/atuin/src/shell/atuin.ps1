@@ -97,7 +97,7 @@ New-Module -Name Atuin -ScriptBlock {
             $env:ATUIN_SHELL_POWERSHELL = "true"
             $env:ATUIN_QUERY = $query
             $argString = "search -i --result-file ""$resultFile"" $ExtraArgs"
-            Start-Process -Wait -NoNewWindow -FilePath atuin -ArgumentList $argString
+            Start-Process -PassThru -NoNewWindow -FilePath atuin -ArgumentList $argString | Wait-Process
             $suggestion = (Get-Content -Raw $resultFile -Encoding UTF8 | Out-String).Trim()
 
             # PSReadLine maintains its own cursor position, which will no longer be valid if Atuin scrolls the display in inline mode.
