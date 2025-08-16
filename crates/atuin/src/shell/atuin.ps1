@@ -3,6 +3,10 @@
 # This should support PowerShell 5.1 (which is shipped with Windows) and later versions, on Windows and Linux.
 #
 # Usage: atuin init powershell | Out-String | Invoke-Expression
+#
+# Settings:
+# - $env:ATUIN_POWERSHELL_PROMPT_OFFSET - Number of lines to offset the prompt position after exiting search.
+#   This is useful when using a multi-line prompt: e.g. set this to -1 when using a 2-line prompt.
 
 if (Get-Module Atuin -ErrorAction Ignore) {
     Write-Warning "The Atuin module is already loaded."
