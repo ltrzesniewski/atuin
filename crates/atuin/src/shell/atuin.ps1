@@ -116,15 +116,11 @@ New-Module -Name Atuin -ScriptBlock {
             }
 
             $acceptPrefix = "__atuin_accept__:"
-            $chainCommandPrefix = "__atuin_chain_command__:"
 
             if ( $suggestion.StartsWith($acceptPrefix)) {
                 [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
                 [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion.Substring($acceptPrefix.Length))
                 [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
-            } elseif ( $suggestion.StartsWith($chainCommandPrefix)) {
-                [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
-                [Microsoft.PowerShell.PSConsoleReadLine]::Insert("$query $($suggestion.Substring($chainCommandPrefix.Length))")
             } else {
                 [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
                 [Microsoft.PowerShell.PSConsoleReadLine]::Insert($suggestion)
