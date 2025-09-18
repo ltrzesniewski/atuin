@@ -98,7 +98,7 @@ New-Module -Name Atuin -ScriptBlock {
             [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$query, [ref]$null)
 
             # Atuin is started through Start-Process to avoid interfering with the current shell.
-            $env:ATUIN_SHELL_POWERSHELL = "true"
+            $env:ATUIN_SHELL = "powershell"
             $env:ATUIN_QUERY = $query
             $argString = "search -i --result-file ""$resultFile"" $ExtraArgs"
             Start-Process -PassThru -NoNewWindow -FilePath atuin -ArgumentList $argString | Wait-Process
@@ -128,7 +128,7 @@ New-Module -Name Atuin -ScriptBlock {
         }
         finally {
             [System.Console]::OutputEncoding = $previousOutputEncoding
-            $env:ATUIN_SHELL_POWERSHELL = $null
+            $env:ATUIN_SHELL = $null
             $env:ATUIN_QUERY = $null
             Remove-Item $resultFile
         }
