@@ -118,31 +118,6 @@ pub fn broken_symlink<P: Into<PathBuf>>(path: P) -> bool {
     path.is_symlink() && !path.exists()
 }
 
-pub fn is_zsh() -> bool {
-    // only set on zsh
-    env::var("ATUIN_SHELL_ZSH").is_ok()
-}
-
-pub fn is_fish() -> bool {
-    // only set on fish
-    env::var("ATUIN_SHELL_FISH").is_ok()
-}
-
-pub fn is_bash() -> bool {
-    // only set on bash
-    env::var("ATUIN_SHELL_BASH").is_ok()
-}
-
-pub fn is_xonsh() -> bool {
-    // only set on xonsh
-    env::var("ATUIN_SHELL_XONSH").is_ok()
-}
-
-pub fn is_powershell() -> bool {
-    // only set on powershell
-    env::var("ATUIN_SHELL_POWERSHELL").is_ok()
-}
-
 /// Extension trait for anything that can behave like a string to make it easy to escape control
 /// characters.
 ///
@@ -150,7 +125,7 @@ pub fn is_powershell() -> bool {
 /// printing history as well as to ensure the commands that appear in the interactive search
 /// reflect the actual command run rather than just the printable characters.
 pub trait Escapable: AsRef<str> {
-    fn escape_control(&self) -> Cow<str> {
+    fn escape_control(&self) -> Cow<'_, str> {
         if !self.as_ref().contains(|c: char| c.is_ascii_control()) {
             self.as_ref().into()
         } else {

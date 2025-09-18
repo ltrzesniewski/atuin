@@ -133,12 +133,7 @@ impl Theme {
                     *name,
                     StyleFactory::from_fg_string(color).unwrap_or_else(|err| {
                         if debug {
-                            log::warn!(
-                                "Tried to load string as a color unsuccessfully: ({}={}) {}",
-                                name,
-                                color,
-                                err
-                            );
+                            log::warn!("Tried to load string as a color unsuccessfully: ({name}={color}) {err}");
                         }
                         ContentStyle::default()
                     }),
@@ -376,8 +371,13 @@ impl ThemeManager {
             PathBuf::from(p)
         } else {
             let config_dir = atuin_common::utils::config_dir();
-            let mut theme_file = PathBuf::new();
-            theme_file.push(config_dir);
+            let mut theme_file = if let Ok(p) = std::env::var("ATUIN_CONFIG_DIR") {
+                PathBuf::from(p)
+            } else {
+                let mut theme_file = PathBuf::new();
+                theme_file.push(config_dir);
+                theme_file
+            };
             theme_file.push("themes");
             theme_file
         };
@@ -460,7 +460,7 @@ impl ThemeManager {
             None => match self.load_theme_from_file(name, max_depth.unwrap_or(DEFAULT_MAX_DEPTH)) {
                 Ok(theme) => theme,
                 Err(err) => {
-                    log::warn!("Could not load theme {}: {}", name, err);
+                    log::warn!("Could not load theme {name}: {err}");
                     built_ins.get("default").unwrap()
                 }
             },

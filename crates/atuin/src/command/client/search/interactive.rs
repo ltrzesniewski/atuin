@@ -3,13 +3,18 @@ use std::{
     time::Duration,
 };
 
-use atuin_common::utils::{self, Escapable as _};
+use atuin_common::{shell::Shell, utils::Escapable as _};
 use eyre::Result;
 use futures_util::FutureExt;
 use semver::Version;
 use time::OffsetDateTime;
 use unicode_width::UnicodeWidthStr;
 
+use super::{
+    cursor::Cursor,
+    engines::{SearchEngine, SearchState},
+    history_list::{HistoryList, ListState, PREFIX_LENGTH},
+};
 use atuin_client::{
     database::{Database, current_context},
     history::{History, HistoryStats, store::HistoryStore},
@@ -18,12 +23,7 @@ use atuin_client::{
     },
 };
 
-use super::{
-    cursor::Cursor,
-    engines::{SearchEngine, SearchState},
-    history_list::{HistoryList, ListState, PREFIX_LENGTH},
-};
-
+use crate::command::client::search::history_list::HistoryHighlighter;
 use crate::command::client::theme::{Meaning, Theme};
 use crate::{VERSION, command::client::search::engines};
 
@@ -169,11 +169,11 @@ impl State {
         }
         .or_else(|| self.current_cursor.map(|_| CursorStyle::DefaultUserShape));
 
-        if cursor_style != self.current_cursor {
-            if let Some(style) = cursor_style {
-                self.current_cursor = cursor_style;
-                let _ = execute!(stdout(), Self::cast_cursor_style(style));
-            }
+        if cursor_style != self.current_cursor
+            && let Some(style) = cursor_style
+        {
+            self.current_cursor = cursor_style;
+            let _ = execute!(stdout(), Self::cast_cursor_style(style));
         }
     }
 
@@ -369,6 +369,11 @@ impl State {
                     self.set_keymap_cursor(settings, "vim_insert");
                     self.keymap_mode = KeymapMode::VimInsert;
                     return InputAction::Continue;
+                }
+                KeyCode::Char(c @ '1'..='9') => {
+                    return c.to_digit(10).map_or(InputAction::Continue, |c| {
+                        InputAction::Accept(self.results_state.selected() + c as usize)
+                    });
                 }
                 KeyCode::Char(_) if !ctrl => {
                     return InputAction::Continue;
@@ -732,6 +737,10 @@ impl State {
 
         match self.tab_index {
             0 => {
+                let history_highlighter = HistoryHighlighter {
+                    engine: self.engine.as_ref(),
+                    search_input: self.search.input.as_str(),
+                };
                 let results_list = Self::build_results_list(
                     style,
                     results,
@@ -739,6 +748,8 @@ impl State {
                     &self.now,
                     indicator.as_str(),
                     theme,
+                    history_highlighter,
+                    settings.show_numeric_shortcuts,
                 );
                 f.render_stateful_widget(results_list, results_list_chunk, &mut self.results_state);
             }
@@ -762,6 +773,7 @@ impl State {
                         &results[self.results_state.selected()],
                         &stats.expect("Drawing inspector, but no stats"),
                         theme,
+                        settings.timezone,
                     );
                 }
 
@@ -809,7 +821,7 @@ impl State {
         }
     }
 
-    fn build_title(&self, theme: &Theme) -> Paragraph {
+    fn build_title(&self, theme: &Theme) -> Paragraph<'_> {
         let title = if self.update_needed.is_some() {
             let error_style: Style = theme.get_error().into();
             Paragraph::new(Text::from(Span::styled(
@@ -827,7 +839,7 @@ impl State {
     }
 
     #[allow(clippy::unused_self)]
-    fn build_help(&self, settings: &Settings, theme: &Theme) -> Paragraph {
+    fn build_help(&self, settings: &Settings, theme: &Theme) -> Paragraph<'_> {
         match self.tab_index {
             // search
             0 => Paragraph::new(Text::from(Line::from(vec![
@@ -865,7 +877,7 @@ impl State {
         .alignment(Alignment::Center)
     }
 
-    fn build_stats(&self, theme: &Theme) -> Paragraph {
+    fn build_stats(&self, theme: &Theme) -> Paragraph<'_> {
         Paragraph::new(Text::from(Span::raw(format!(
             "history count: {}",
             self.history_count,
@@ -874,6 +886,7 @@ impl State {
         .alignment(Alignment::Right)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_results_list<'a>(
         style: StyleState,
         results: &'a [History],
@@ -881,6 +894,8 @@ impl State {
         now: &'a dyn Fn() -> OffsetDateTime,
         indicator: &'a str,
         theme: &'a Theme,
+        history_highlighter: HistoryHighlighter<'a>,
+        show_numeric_shortcuts: bool,
     ) -> HistoryList<'a> {
         let results_list = HistoryList::new(
             results,
@@ -889,6 +904,8 @@ impl State {
             now,
             indicator,
             theme,
+            history_highlighter,
+            show_numeric_shortcuts,
         );
 
         if style.compact {
@@ -909,7 +926,7 @@ impl State {
         }
     }
 
-    fn build_input(&self, style: StyleState) -> Paragraph {
+    fn build_input(&self, style: StyleState) -> Paragraph<'_> {
         /// Max width of the UI box showing current mode
         const MAX_WIDTH: usize = 14;
         let (pref, mode) = if self.switched_search_mode {
@@ -947,7 +964,7 @@ impl State {
         preview_width: u16,
         chunk_width: usize,
         theme: &Theme,
-    ) -> Paragraph {
+    ) -> Paragraph<'_> {
         let selected = self.results_state.selected();
         let command = if results.is_empty() {
             String::new()
@@ -1066,6 +1083,16 @@ pub async fn history(
             .unwrap_or(settings.inline_height)
     } else {
         settings.inline_height
+    };
+
+    // Use fullscreen mode if the inline height doesn't fit in the terminal,
+    // this will preserve the scroll position upon exit
+    let inline_height = if let Ok(size) = terminal::size()
+        && inline_height >= size.1
+    {
+        0
+    } else {
+        inline_height
     };
 
     let stdout = Stdout::new(inline_height > 0)?;
@@ -1242,18 +1269,16 @@ pub async fn history(
     match result {
         InputAction::Accept(index) if index < results.len() => {
             let mut command = results.swap_remove(index).command;
-            if accept
-                && (utils::is_zsh()
-                    || utils::is_fish()
-                    || utils::is_bash()
-                    || utils::is_xonsh()
-                    || utils::is_powershell())
+
+            if is_command_chaining {
+                command = format!("{} {}", original_query.trim_end(), command);
+            } else if accept
+                && matches!(
+                    Shell::from_env(),
+                    Shell::Zsh | Shell::Fish | Shell::Bash | Shell::Xonsh
+                )
             {
-                if is_command_chaining {
-                    command = String::from("__atuin_chain_command__:") + &command;
-                } else {
-                    command = String::from("__atuin_accept__:") + &command;
-                }
+                command = String::from("__atuin_accept__:") + &command;
             }
 
             // index is in bounds so we return that entry

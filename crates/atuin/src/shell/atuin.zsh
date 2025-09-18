@@ -57,7 +57,7 @@ _atuin_search() {
     # TODO: not this
     local output
     # shellcheck disable=SC2048
-    output=$(ATUIN_SHELL_ZSH=t ATUIN_LOG=error ATUIN_QUERY=$BUFFER atuin search $* -i 3>&1 1>&2 2>&3)
+    output=$(ATUIN_SHELL=zsh ATUIN_LOG=error ATUIN_QUERY=$BUFFER atuin search $* -i 3>&1 1>&2 2>&3)
 
     zle reset-prompt
     # re-enable bracketed paste
@@ -65,7 +65,6 @@ _atuin_search() {
     echo -n ${zle_bracketed_paste[1]} >/dev/tty
 
     if [[ -n $output ]]; then
-        local original_buffer=$BUFFER
         RBUFFER=""
         LBUFFER=$output
 
@@ -73,10 +72,6 @@ _atuin_search() {
         then
             LBUFFER=${LBUFFER#__atuin_accept__:}
             zle accept-line
-        elif [[ $LBUFFER == __atuin_chain_command__:* ]]
-        then
-            local new_command=${LBUFFER#__atuin_chain_command__:}
-            LBUFFER="$original_buffer $new_command"
         fi
     fi
 }

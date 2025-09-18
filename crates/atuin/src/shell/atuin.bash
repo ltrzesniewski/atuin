@@ -254,7 +254,7 @@ __atuin_history() {
         local READLINE_LINE="" READLINE_POINT=0
 
     local __atuin_output
-    __atuin_output=$(ATUIN_SHELL_BASH=t ATUIN_LOG=error ATUIN_QUERY="$READLINE_LINE" atuin search "$@" -i 3>&1 1>&2 2>&3)
+    __atuin_output=$(ATUIN_SHELL=bash ATUIN_LOG=error ATUIN_QUERY="$READLINE_LINE" atuin search "$@" -i 3>&1 1>&2 2>&3)
 
     # We do nothing when the search is canceled.
     [[ $__atuin_output ]] || return 0
@@ -270,10 +270,6 @@ __atuin_history() {
         fi
 
         READLINE_LINE=""
-        READLINE_POINT=${#READLINE_LINE}
-    elif [[ $__atuin_output == __atuin_chain_command__:* ]]; then
-        local new_command=${__atuin_output#__atuin_chain_command__:}
-        READLINE_LINE="$READLINE_LINE $new_command"
         READLINE_POINT=${#READLINE_LINE}
     else
         READLINE_LINE=$__atuin_output

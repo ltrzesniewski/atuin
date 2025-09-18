@@ -86,6 +86,9 @@ pub enum FilterMode {
 
     #[serde(rename = "workspace")]
     Workspace = 4,
+
+    #[serde(rename = "session-preload")]
+    SessionPreload = 5,
 }
 
 impl FilterMode {
@@ -96,6 +99,7 @@ impl FilterMode {
             FilterMode::Session => "SESSION",
             FilterMode::Directory => "DIRECTORY",
             FilterMode::Workspace => "WORKSPACE",
+            FilterMode::SessionPreload => "SESSION+",
         }
     }
 }
@@ -134,7 +138,7 @@ impl From<Dialect> for interim::Dialect {
 /// Note that the parsing of this struct needs to be done before starting any
 /// multithreaded runtime, otherwise it will fail on most Unix systems.
 ///
-/// See: https://github.com/atuinsh/atuin/pull/1517#discussion_r1447516426
+/// See: <https://github.com/atuinsh/atuin/pull/1517#discussion_r1447516426>
 #[derive(Clone, Copy, Debug, Eq, PartialEq, DeserializeFromStr, Serialize)]
 pub struct Timezone(pub UtcOffset);
 impl fmt::Display for Timezone {
@@ -420,6 +424,7 @@ impl Default for Search {
                 FilterMode::Global,
                 FilterMode::Host,
                 FilterMode::Session,
+                FilterMode::SessionPreload,
                 FilterMode::Workspace,
                 FilterMode::Directory,
             ],
@@ -468,6 +473,7 @@ pub struct Settings {
     pub max_preview_height: u16,
     pub show_help: bool,
     pub show_tabs: bool,
+    pub show_numeric_shortcuts: bool,
     pub auto_hide_height: u16,
     pub exit_mode: ExitMode,
     pub keymap_mode: KeymapMode,
@@ -770,6 +776,7 @@ impl Settings {
             .set_default("max_preview_height", 4)?
             .set_default("show_help", true)?
             .set_default("show_tabs", true)?
+            .set_default("show_numeric_shortcuts", true)?
             .set_default("auto_hide_height", 8)?
             .set_default("invert", false)?
             .set_default("exit_mode", "return-original")?
@@ -812,7 +819,14 @@ impl Settings {
             .set_default("scripts.db_path", scripts_path.to_str())?
             .set_default(
                 "search.filters",
-                vec!["global", "host", "session", "workspace", "directory"],
+                vec![
+                    "global",
+                    "host",
+                    "session",
+                    "workspace",
+                    "directory",
+                    "session-preload",
+                ],
             )?
             .set_default("theme.name", "default")?
             .set_default("theme.debug", None::<bool>)?
@@ -874,6 +888,7 @@ impl Settings {
         settings.record_store_path = Self::expand_path(settings.record_store_path)?;
         settings.key_path = Self::expand_path(settings.key_path)?;
         settings.session_path = Self::expand_path(settings.session_path)?;
+        settings.daemon.socket_path = Self::expand_path(settings.daemon.socket_path)?;
 
         Ok(settings)
     }
