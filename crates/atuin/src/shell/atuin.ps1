@@ -86,7 +86,7 @@ New-Module -Name Atuin -ScriptBlock {
         return $line
     }
 
-    function RunSearch {
+    function Run-AtuinSearch {
         param([string]$ExtraArgs = "")
 
         $previousOutputEncoding = [System.Console]::OutputEncoding
@@ -151,7 +151,7 @@ New-Module -Name Atuin -ScriptBlock {
 
         if ($CtrlR) {
             Set-PSReadLineKeyHandler -Chord "Ctrl+r" -BriefDescription "Runs Atuin search" -ScriptBlock {
-                RunSearch
+                Run-AtuinSearch
             }
         }
 
@@ -161,7 +161,7 @@ New-Module -Name Atuin -ScriptBlock {
                 [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$null)
 
                 if (!$line.Contains("`n")) {
-                    RunSearch -ExtraArgs "--shell-up-key-binding"
+                    Run-AtuinSearch -ExtraArgs "--shell-up-key-binding"
                 } else {
                     [Microsoft.PowerShell.PSConsoleReadLine]::PreviousLine()
                 }
