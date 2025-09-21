@@ -7,7 +7,7 @@
 # Settings:
 # - $env:ATUIN_POWERSHELL_PROMPT_OFFSET - Number of lines to offset the prompt position after exiting search.
 #   This is useful when using a multi-line prompt: e.g. set this to -1 when using a 2-line prompt.
-#   It is initialized from the prompt length if not set.
+#   It is initialized from the current prompt line count if not set when the first Atuin search is performed.
 
 if (Get-Module Atuin -ErrorAction Ignore) {
     Write-Warning "The Atuin module is already loaded."
@@ -86,7 +86,7 @@ New-Module -Name Atuin -ScriptBlock {
         return $line
     }
 
-    function Run-AtuinSearch {
+    function Invoke-AtuinSearch {
         param([string]$ExtraArgs = "")
 
         $previousOutputEncoding = [System.Console]::OutputEncoding
@@ -105,8 +105,8 @@ New-Module -Name Atuin -ScriptBlock {
             Start-Process -PassThru -NoNewWindow -FilePath atuin -ArgumentList $argString | Wait-Process
             $suggestion = (Get-Content -Raw $resultFile -Encoding UTF8 | Out-String).Trim()
 
-            # If no shell prompt offset is set, initialize it from the prompt length.
-            if ($env:ATUIN_POWERSHELL_PROMPT_OFFSET -eq $null) {
+            # If no shell prompt offset is set, initialize it from the current prompt line count.
+            if ($null -eq $env:ATUIN_POWERSHELL_PROMPT_OFFSET) {
                 try {
                     $promptLines = (& $Function:prompt | Out-String | Measure-Object -Line).Lines
                     $env:ATUIN_POWERSHELL_PROMPT_OFFSET = -1 * ($promptLines - 1)
@@ -151,7 +151,7 @@ New-Module -Name Atuin -ScriptBlock {
 
         if ($CtrlR) {
             Set-PSReadLineKeyHandler -Chord "Ctrl+r" -BriefDescription "Runs Atuin search" -ScriptBlock {
-                Run-AtuinSearch
+                Invoke-AtuinSearch
             }
         }
 
@@ -161,7 +161,7 @@ New-Module -Name Atuin -ScriptBlock {
                 [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$null)
 
                 if (!$line.Contains("`n")) {
-                    Run-AtuinSearch -ExtraArgs "--shell-up-key-binding"
+                    Invoke-AtuinSearch -ExtraArgs "--shell-up-key-binding"
                 } else {
                     [Microsoft.PowerShell.PSConsoleReadLine]::PreviousLine()
                 }
