@@ -29,14 +29,13 @@ use crate::{
 use super::{
     history::History,
     ordering,
-    settings::{FilterMode, SearchMode, Settings},
+    settings::{FilterMode, SearchMode},
 };
 
 pub struct Context {
     pub session: String,
     pub cwd: String,
     pub hostname: String,
-    pub host_id: String,
     pub git_root: Option<PathBuf>,
 }
 
@@ -60,7 +59,6 @@ pub async fn current_context() -> eyre::Result<Context> {
     })?;
     let hostname = get_host_user();
     let cwd = utils::get_current_dir();
-    let host_id = Settings::host_id().await?;
     let git_root = utils::in_git_repo(cwd.as_str());
 
     Ok(Context {
@@ -68,7 +66,6 @@ pub async fn current_context() -> eyre::Result<Context> {
         hostname,
         cwd,
         git_root,
-        host_id: host_id.0.as_simple().to_string(),
     })
 }
 
@@ -846,7 +843,6 @@ mod test {
             hostname: "test:host".to_string(),
             session: "beepboopiamasession".to_string(),
             cwd: "/home/ellie".to_string(),
-            host_id: "test-host".to_string(),
             git_root: None,
         };
 
@@ -1143,7 +1139,6 @@ mod test {
             hostname: "test:host".to_string(),
             session: "beepboopiamasession".to_string(),
             cwd: "/home/ellie".to_string(),
-            host_id: "test-host".to_string(),
             git_root: None,
         };
 
